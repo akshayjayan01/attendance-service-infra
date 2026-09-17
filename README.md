@@ -9,22 +9,47 @@ Targets: 6,000 req/s, 99.9% success, 99.9% of responses under 300 ms, across 3 A
 ## Architecture
 
 ```
-Internet
-   |
- HTTPS
-   |
-  ALB          public subnets, 3 AZs
-   |
-  ASG          private subnets, 3 AZs, 6-20 instances
-   |
- nginx         default welcome page
-   |
-CloudWatch     alarms + dashboard
+                    USERS
+                      |
+                      v
+                    HTTPS
+                      |
+                      v
+           +----------------------+
+           | Application Load     |
+           | Balancer             |
+           | Health Checks        |
+           +----------+-----------+
+                      |
+     +----------------+----------------+
+     |                |                |
+  AZ-1              AZ-2             AZ-3
+     |                |                |
++----v----+      +----v----+      +----v----+
+| EC2     |      | EC2     |      | EC2     |
+| nginx   |      | nginx   |      | nginx   |
++---------+      +---------+      +---------+
+     |                |                |
++----v----+      +----v----+      +----v----+
+| EC2     |      | EC2     |      | EC2     |
+| nginx   |      | nginx   |      | nginx   |
++---------+      +---------+      +---------+
+
+             Auto Scaling Group
+             Min: 6
+             Desired: 6
+             Max: 20
+
+                    |
+                    v
+               CloudWatch
+              /         \
+        Metrics         Alarms
 ```
 
 - The ALB is public and terminates HTTPS. HTTP redirects to HTTPS.
-- EC2 instances are private. No public IPs, no inbound path from the internet.
-- Instances run across 3 Availability Zones, two per AZ at the baseline.
+- EC2 instances are private, in private subnets. No public IPs, no inbound path from
+  the internet.
 - The ASG starts at 6 instances and replaces unhealthy ones.
 - nginx is stateless, so instances are disposable.
 - Access is through SSM Session Manager. There is no SSH.
