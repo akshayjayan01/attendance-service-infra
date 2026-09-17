@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars. Anything not set here uses the default in variables.tf.
+
+aws_region    = "us-east-1"
+instance_type = "t3.xlarge"
+
+asg_min_size         = 6
+asg_desired_capacity = 6
+asg_max_size         = 20
+
+# Required. Same region as the ALB. Get it with:
+#   aws acm list-certificates --region us-east-1 \
+#     --query 'CertificateSummaryList[].CertificateArn' --output text
+#
+# acm_certificate_arn = "arn:aws:acm:us-east-1:<account-id>:certificate/<certificate-id>"
