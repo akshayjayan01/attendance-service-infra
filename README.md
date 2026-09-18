@@ -112,19 +112,12 @@ still 8,000 req/s nominal against the 6,000 requirement.
 
 **Success rate — 99.9%**
 
-Server-side failures only: ALB 5xx plus target 5xx, measured against `RequestCount`.
-For this assessment, 4xx responses are treated as client-side and excluded from the
-server-error SLO — that's a measurement decision, not a claim that every 4xx originates
-from the client. AWS excludes health check requests from ALB metrics, so probes don't
-inflate the denominator.
+We count ALB and target 5xx responses as server failures and measure them against the total request count. For this assessment, 4xx responses are treated as client errors and are not included in the server error SLO. Health check requests are excluded from ALB metrics, so they do not affect the calculation.
 
 Error budget is 0.1% — roughly 1,000 failed requests per 1,000,000.
 
 **Latency — 99.9% under 300 ms**
-
-`TargetResponseTime` at the p99.9 extended statistic, alarmed at 300 ms. k6 measures
-end-to-end client latency. Average latency is not evidence for this SLO: an average can
-sit comfortably under 300 ms while the slowest 1% are far over it.
+We use `TargetResponseTime` at p99.9 and set the alarm at 300 ms. k6 measures the latency from the client side. We use p99.9 instead of average latency because average latency can look good even when some requests take much longer than 300 ms.
 
 ## Monitoring and Alarms
 
@@ -139,13 +132,9 @@ Six alarms. Five are for monitoring; one drives scale-in.
 | `healthy-hosts-low` | `HealthyHostCount` < 4 | Availability |
 | `scale-in` | `RequestCountPerTarget` < 48,000/min | Auto Scaling |
 
-`scale-in` is an internal scaling trigger, not an alert — it is the only alarm with an
-action, and that action is the scale-in step policy, not a notification. `healthy-hosts-low`
-is an availability alarm and does not trigger scaling. No alarm notifies anyone, because
-this stack creates no SNS topic.
+The `scale-in alarm` is used only for scaling and does not send notifications. It triggers the scale-in step policy. The `healthy-hosts-low` alarm is used to monitor availability and does not trigger scaling. None of the alarms send notifications because this stack does not create an SNS topic.  
 
-The `classroom-attendance-slo` dashboard contains 3 widgets and 10 metric series covering
-success rate, latency percentiles (p50/p95/p99/p99.9), and capacity/scaling.
+The `classroom-attendance-slo` dashboard contains 3 widgets and 10 metric series covering success rate, latency percentiles (p50/p95/p99/p99.9), and capacity/scaling.
 
 ## Health Checks
 
@@ -158,20 +147,13 @@ success rate, latency percentiles (p50/p95/p99/p99.9), and capacity/scaling.
 | Unhealthy threshold | 2 failed checks | explicit |
 | Healthy threshold | 3 | provider default |
 
-HTTP is deliberate — the ALB-to-nginx hop stays inside the VPC and nginx serves a static
-response, so there is nothing to gain from TLS on the health check. Detection lands
-around 5–10 seconds depending on where the failure falls in the check cycle.
+We use HTTP because the ALB to nginx connection stays inside the VPC, and nginx only serves a static response. TLS is not needed for this health check. A failed target is usually detected within 5 to 10 seconds, depending on when the failure happens during the health check cycle.
 
 ## Connection Draining
 
-`deregistration_delay` is **300 seconds**, the AWS default — it is not set in the
-Terraform. When an instance is deregistered the ALB stops sending it new requests while
-in-flight requests are allowed to finish.
+`deregistration_delay` is 300 seconds, which is the AWS default. It is not set in Terraform. When an instance is removed, the ALB stops sending it new requests and allows existing requests to finish.
 
-Left at the default deliberately. The workload is a static nginx response and the
-assessment prioritizes simplicity over tuning, so there was no reason to shorten it. If
-scale-in testing showed slow deregistration, this is the value to tune, based on the
-request durations actually observed.
+We left the default because the service is a simple static nginx application. If testing shows that scale-in takes too long, we can reduce this value based on the request times we observe.
 
 ## Security
 
