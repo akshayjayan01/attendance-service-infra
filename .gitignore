@@ -1,7 +1,12 @@
-# Terraform state 
+# Claude Code local settings
+.claude/
+
+# Terraform state - never commit. Holds resource attributes in cleartext.
 *.tfstate
 *.tfstate.*
 
-# Provider plugins
+# Provider plugins. The lock file is committed - it pins the provider version.
 .terraform/
-terraform/.terraform.lock.hcl
+
+# Submission archive
+terraform.zip
